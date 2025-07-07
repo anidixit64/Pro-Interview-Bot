@@ -3,11 +3,11 @@
 
 import os
 import re
-import keyring
 import google.generativeai as genai
 from PyPDF2 import PdfReader
 import sys
-from . import prompts
+from .. import prompts, config
+
 
 # --- Default Configuration & Constants ---
 DEFAULT_NUM_TOPICS = 1
@@ -20,30 +20,15 @@ MAX_FOLLOW_UPS_LIMIT = 5
 MODEL_NAME = "gemini-1.5-flash-latest"
 ERROR_PREFIX = "Error: "
 
-# --- Keyring Constants for Gemini ---
-KEYRING_SERVICE_NAME_GEMINI = "InterviewBotPro_Gemini"
-KEYRING_USERNAME_GEMINI = "gemini_api_key"
 
 # --- Core Logic Functions ---
 
 def configure_gemini():
     """
-    Loads Google API key from keyring and configures the Gemini client.
+    Loads Google API key from Google Cloud and configures the Gemini client.
     Returns True on success, False on failure.
     """
-    api_key = None
-    try:
-        print(f"Attempting to retrieve Gemini API key from keyring (Service: '{KEYRING_SERVICE_NAME_GEMINI}')...")
-        api_key = keyring.get_password(KEYRING_SERVICE_NAME_GEMINI, KEYRING_USERNAME_GEMINI)
-        if not api_key:
-            print(f"{ERROR_PREFIX}Gemini API key not found in keyring for service '{KEYRING_SERVICE_NAME_GEMINI}'.")
-            print("Please store your key using your system's keyring.")
-            return False
-        print("Gemini API key retrieved from keyring.")
-
-    except Exception as e:
-        print(f"{ERROR_PREFIX}Accessing keyring failed: {e}")
-        return False
+    api_key = config.get_gemini_api_key()
 
     try:
         genai.configure(api_key=api_key)
@@ -53,31 +38,6 @@ def configure_gemini():
         print(f"{ERROR_PREFIX}Configuring Gemini API with retrieved key: {e}")
         return False
 
-def extract_text_from_pdf(pdf_path):
-    """
-    Extracts text from a given PDF file path.
-    Returns extracted text string on success, None on failure.
-    """
-    if not pdf_path or not os.path.exists(pdf_path):
-        print(f"{ERROR_PREFIX}Invalid or non-existent PDF path: {pdf_path}")
-        return None
-    print(f"Reading PDF: {pdf_path}...")
-    try:
-        reader = PdfReader(pdf_path)
-        text = ""
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-
-        if not text.strip():
-            print(f"Warning: No text extracted from '{os.path.basename(pdf_path)}'.")
-            return None
-        print("PDF text extracted successfully.")
-        return text
-    except Exception as e:
-        print(f"{ERROR_PREFIX}Reading PDF '{os.path.basename(pdf_path)}': {e}")
-        return None
 
 def generate_initial_questions(resume_text, job_desc_text="", model_name=MODEL_NAME, num_questions=DEFAULT_NUM_TOPICS):
     """
